@@ -1,0 +1,4 @@
+interface:
+  display_name: "Racing Science Card"
+  short_description: "赛车工程与赛事故事科普卡片提示词"
+  default_prompt: "使用 racing-science-card，把这个赛车主题转成一张事实边界清楚的 3:4 科普卡提示词。"

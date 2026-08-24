@@ -1,130 +1,78 @@
 #!/usr/bin/env python3
+"""Safely export racing-card prompts from JSON to text files.
+
+This helper is intentionally offline. It never reads credentials and never
+calls a model or an image service.
 """
-赛车科普卡片批量生成 — Codex gpt-image-2 pipeline
-依赖: Hermes Agent (Codex OAuth token 读取)
-用法: python3 gen_cards.py <prompts.json路径> <输出目录>
-"""
 
-import json, sys, os, base64
+from __future__ import annotations
 
-# === 配置：根据你的 Hermes 安装路径修改 ===
-HERMES_AGENT_PATH = os.path.expanduser("~/.hermes/hermes-agent")
-# =============================================
-
-sys.path.insert(0, HERMES_AGENT_PATH)
-os.chdir(HERMES_AGENT_PATH)
-
-from agent.auxiliary_client import _read_codex_access_token, _codex_cloudflare_headers
-import openai
-
-QUALITY = "high"
-API_MODEL = "gpt-image-2"
-CHAT_MODEL = "gpt-5.4"
-BASE_URL = "https://chatgpt.com/backend-api/codex"
-INSTRUCTIONS = (
-    "You are an assistant that must fulfill image generation requests "
-    "by using the image_generation tool when provided."
-)
+import argparse
+import hashlib
+import json
+import re
+from pathlib import Path
 
 
-def gen_card(prompt: str, output_path: str) -> bool:
-    """生成单张卡片，返回是否成功"""
-    token = _read_codex_access_token()
-    if not token:
-        print("No Codex token — is Codex.app running and logged in?")
-        return False
+def safe_slug(value: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", value.strip()).strip("-.")
+    return slug or "prompt"
 
-    client = openai.OpenAI(
-        api_key=token,
-        base_url=BASE_URL,
-        default_headers=_codex_cloudflare_headers(token),
+
+def load_prompts(path: Path) -> dict[str, str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("prompts.json must be a non-empty object")
+    prompts: dict[str, str] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str) or not isinstance(value, str) or not value.strip():
+            raise ValueError("every prompt entry must map a string name to non-empty text")
+        prompts[key] = value.strip() + "\n"
+    return prompts
+
+
+def export_prompts(prompts: dict[str, str], output_dir: Path) -> list[dict[str, object]]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest: list[dict[str, object]] = []
+    used: set[str] = set()
+
+    for index, (name, prompt) in enumerate(prompts.items(), start=1):
+        base = safe_slug(name)
+        filename = f"{index:02d}-{base}.txt"
+        if filename in used:
+            digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
+            filename = f"{index:02d}-{base}-{digest}.txt"
+        used.add(filename)
+
+        destination = output_dir / filename
+        destination.write_text(prompt, encoding="utf-8")
+        manifest.append(
+            {
+                "name": name,
+                "file": filename,
+                "characters": len(prompt.rstrip("\n")),
+                "sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            }
+        )
+
+    (output_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
     )
-
-    image_b64 = None
-    try:
-        with client.responses.stream(
-            model=CHAT_MODEL,
-            store=False,
-            instructions=INSTRUCTIONS,
-            input=[{
-                "type": "message",
-                "role": "user",
-                "content": [{"type": "input_text", "text": prompt}],
-            }],
-            tools=[{
-                "type": "image_generation",
-                "model": API_MODEL,
-                "size": "1024x1536",
-                "quality": QUALITY,
-                "output_format": "png",
-                "background": "opaque",
-                "partial_images": 1,
-            }],
-            tool_choice={
-                "type": "allowed_tools",
-                "mode": "required",
-                "tools": [{"type": "image_generation"}],
-            },
-        ) as stream:
-            for event in stream:
-                et = getattr(event, "type", "")
-                if et == "response.output_item.done":
-                    item = getattr(event, "item", None)
-                    if getattr(item, "type", None) == "image_generation_call":
-                        result = getattr(item, "result", None)
-                        if isinstance(result, str) and result:
-                            image_b64 = result
-                elif et == "response.image_generation_call.partial_image":
-                    partial = getattr(event, "partial_image_b64", None)
-                    if isinstance(partial, str) and partial:
-                        image_b64 = partial
-            final = stream.get_final_response()
-
-        for item in getattr(final, "output", None) or []:
-            if getattr(item, "type", None) == "image_generation_call":
-                result = getattr(item, "result", None)
-                if isinstance(result, str) and result:
-                    image_b64 = result
-
-        if not image_b64:
-            print(f"   No image in response")
-            return False
-
-        img_bytes = base64.b64decode(image_b64)
-        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-        with open(output_path, "wb") as f:
-            f.write(img_bytes)
-        print(f"   Saved: {os.path.basename(output_path)} ({len(img_bytes)/1024:.0f} KB)")
-        return True
-
-    except Exception as e:
-        print(f"   Failed: {e}")
-        return False
+    return manifest
 
 
-def main():
-    if len(sys.argv) < 3:
-        print("Usage: python3 gen_cards.py <prompts.json> <output_dir>")
-        print()
-        print("prompts.json format:")
-        print('  {"filename.png": "prompt text", ...}')
-        sys.exit(1)
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Export racing-card prompts without network access")
+    parser.add_argument("prompts_json", type=Path)
+    parser.add_argument("output_dir", type=Path)
+    args = parser.parse_args()
 
-    prompts_file = sys.argv[1]
-    out_dir = sys.argv[2]
-
-    with open(prompts_file) as f:
-        prompts = json.load(f)
-
-    ok = 0
-    for filename, prompt in prompts.items():
-        print(f"\n{'='*60}")
-        print(f"Generating: {filename} ({len(prompt)} chars)")
-        if gen_card(prompt, os.path.join(out_dir, filename)):
-            ok += 1
-
-    print(f"\nDone: {ok}/{len(prompts)} generated → {out_dir}/")
+    prompts = load_prompts(args.prompts_json)
+    manifest = export_prompts(prompts, args.output_dir)
+    print(f"Exported {len(manifest)} prompt files to {args.output_dir}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

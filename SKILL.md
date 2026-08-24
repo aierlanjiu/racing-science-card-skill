@@ -1,13 +1,13 @@
 ---
 name: racing-science-card
-description: 赛车科普卡片生成技能。输入赛车主题/赛事/技术概念，输出三种不同视觉风格（工业蓝图/赛道纪实/极净实验室）的Codex提示词并批量出图。触发词：赛车科普卡、赛车卡片、racing card、赛事科普、F1科普卡、拉力赛科普、勒芒科普。
+description: 把赛车工程、赛事历史或人物故事转成工业蓝图、赛道纪实或极净实验室风格的竖版科普卡片提示词。适用于赛车科普、课程配图和社媒内容，不用于实时赛事报道或未经核对的参数结论。
 ---
 
 # Racing Science Card · 赛车科普卡片生成
 
 ## 这个 Skill 做什么
 
-将赛车主题（赛事、技术、人物）转化为三套差异化视觉风格的科普卡片提示词，并通过 Codex OAuth 批量生成 PNG 图像。
+将赛车主题转化为三套差异化视觉风格的科普卡片提示词。默认只输出可复用提示词，不读取本机凭据，也不绑定某个图片模型。
 
 **三套视觉风格：**
 
@@ -17,7 +17,7 @@ description: 赛车科普卡片生成技能。输入赛车主题/赛事/技术�
 | B | 赛道纪实 | 米黄便签纸 + 马克笔手写 + 钨丝灯暖光 | 赛事故事、人物叙事、历史时刻 |
 | C | 极净实验室 | 纯白无菌空间 + 激光蚀刻 + 亚克力展柜 | 尖端科技、材料科学、未来概念 |
 
-**双输出**：Codex 提示词（文本）+ PNG 图像（1024×1536 竖版）
+默认输出包含风格选择、完整提示词、事实待核对清单和成图 QA。只有当前宿主明确提供图像工具时才直接渲染。
 
 ## 何时使用 vs 不何时使用
 
@@ -41,56 +41,31 @@ description: 赛车科普卡片生成技能。输入赛车主题/赛事/技术�
 - 卡片标题（中+英）
 - 视觉锚点（核心3D零件）
 - 4个核心机制
-- 工程公式+标准
+- 工程公式与标准。只有存在可靠来源时才写具体值
 - 4段深度解说
 - 验证图表
 
 详见 `references/meta-prompts.md`。
 
-### Step 4 · 图像生成
-将提示词输入 Codex（gpt-image-2）生成 1024×1536 PNG。生成脚本见 `scripts/gen_cards.py`。
+### Step 4 · 提示词或图像交付
 
-**Codex OAuth 认证配置**见下方「Codex 认证获取」章节。
+优先交付完整提示词。若当前宿主明确提供图像生成工具，可直接生成 3:4 图像；否则不要尝试读取 Keychain、Cookie、OAuth token、API Key 或浏览器 profile。
+
+批量整理时可使用 `scripts/gen_cards.py`。该脚本只把 JSON 中的提示词离线导出为文本文件，不联网、不出图。
 
 ### Step 5 · 验收
-- 文件 > 10KB
-- 中文文字清晰可读
-- 无畸变/乱码/幽灵字
 
-## Codex 认证获取
+- 中文文字清晰可读，无畸变、乱码或幽灵字。
+- 赛事数据、速度、马力、标准号、公式结果与品牌事实有来源，或明确标为概念示意。
+- 图片完整保持 3:4，不通过裁切伪造比例。
+- 真实品牌和人物不被表达成官方合作、代言或实测材料。
 
-Codex 图像生成使用 OpenAI ChatGPT 后端的 `gpt-image-2` 模型，通过 Codex OAuth token 免 API Key 调用。
+## 安全边界
 
-### 获取 Codex Access Token（macOS）
-
-```bash
-# Codex 将 token 存储在 Keychain 中，Hermes 的辅助函数可读取：
-python3 -c "
-import sys
-sys.path.insert(0, '/path/to/hermes-agent')
-from agent.auxiliary_client import _read_codex_access_token
-print(_read_codex_access_token()[:20] + '...')
-"
-```
-
-**前置条件**：
-1. 安装 [Hermes Agent](https://github.com/user/hermes-agent)
-2. 在 Codex.app 中登录你的 OpenAI 账号（Team Plan 或 Pro Plan）
-3. Codex 安装 `openai-codex` plugin
-
-### Token 有效期
-- Codex OAuth token 有效期通常为 1 小时
-- 过期后 Hermes 会自动从 Keychain 刷新
-- Team Plan 有日配额限制（约 50-100 张/天）
-
-### 支持的平台（均可使用本 Skill 的提示词）
-
-| 平台 | 方式 | 说明 |
-|------|------|------|
-| **Codex.app** (macOS) | OAuth 自动 | 通过 Hermes agent 的 `_read_codex_access_token()` 免 Key 调用 |
-| **ChatGPT Plus/Pro** | 网页端粘贴提示词 | 在 chatgpt.com 输入框直接提交，DALL·E/gpt-image 渲染 |
-| **OpenAI API** | API Key | 使用 `openai` Python SDK，model=`gpt-image-2` |
-| **Claude Code** | 通过此 Skill | 安装后 `/racing-science-card` 调用 |
+- 不读取或打印 Keychain、Cookie、API Key、OAuth token 或浏览器 profile。
+- 不使用未公开接口或伪装成官方客户端。
+- 不虚构赛事数据、工程公式结果、官方标准或品牌背书。
+- 需要当前模型、价格、套餐或赛事状态时，先查询官方来源。
 
 ## 三种风格元提示词
 
@@ -101,12 +76,14 @@ print(_read_codex_access_token()[:20] + '...')
 ```
 racing-science-card-skill/
 ├── SKILL.md                    ← 你正在读
-├── README.md                   ← GitHub README + 认证说明
+├── README.md                   ← 安装、Agent 配置与安全边界
+├── LICENSE                     ← MIT 代码与文档许可
+├── SECURITY.md                ← 凭据与渲染器安全边界
 ├── references/
 │   ├── meta-prompts.md         ← 3 套风格元提示词模板
 │   └── racing-examples.md      ← 3 场赛车史赛事完整示例
 ├── scripts/
-│   └── gen_cards.py            ← Codex 批量出图脚本
+│   └── gen_cards.py            ← 离线批量提示词导出脚本
 └── assets/
     └── (placeholder)
 ```
