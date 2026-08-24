@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Racing Science Card</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main>
+        <h1>Racing Science Card · 赛车科普卡片生成技能</h1>
+        <p>将赛车工程、赛事历史或人物故事转化成三套差异化竖版科普卡片提示词。默认不绑定图片模型，不读取任何账号凭据。</p>
+        
+        <div class="row">
+            <div class="row-number">01</div>
+            <div class="row-content">
+                <a href="https://github.com/aierlanjiu/racing-science-card-skill" class="action-btn">View on GitHub</a>
+            </div>
+        </div>
+
+        <hr class="irregular-divider">
+
+        <div class="row">
+            <div class="row-number">02</div>
+            <div class="row-content">
+                <h2>Quick Start</h2>
+                <h3>Install to Codex</h3>
+<pre><code>git clone https://github.com/aierlanjiu/racing-science-card-skill.git
+mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
+cp -R racing-science-card-skill "${CODEX_HOME:-$HOME/.codex}/skills/racing-science-card"</code></pre>
+<h3>Generate offline</h3>
+<pre><code>python3 scripts/gen_cards.py prompts.json output-prompts</code></pre>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="row-number">03</div>
+            <div class="row-content">
+                <h2>Workflow</h2>
+                <ol>
+<li>Install the repository to Codex skills.</li>
+<li>Invoke by specifying the skill and target: "使用 racing-science-card，把“尾流分离点”做成 3:4 工业蓝图科普卡".</li>
+<li>Provides prompts for Industrial Blueprint, Track Documentary, or Clean Laboratory styles.</li>
+</ol>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="row-number">04</div>
+            <div class="row-content">
+                <h2>Package Map</h2>
+                <ul>
+<li><code>SKILL.md</code> - Codex skill entry</li>
+<li><code>README.md</code> - Core documentation</li>
+<li><code>SECURITY.md</code> - Security boundaries</li>
+<li><code>references/meta-prompts.md</code> - 3 meta-prompt templates</li>
+<li><code>references/racing-examples.md</code> - Examples</li>
+<li><code>scripts/gen_cards.py</code> - Offline generation script</li>
+</ul>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="row-number">05</div>
+            <div class="row-content">
+                <h2>Safety & Boundary</h2>
+                <p>MIT License for code and docs. The historical data (speed, horsepower) in examples are not verified for production use; re-check against reliable sources. Does not output actual race performance data.</p>
+            </div>
+        </div>
+        
+        
+
+        <hr class="irregular-divider">
+
+        <div class="row">
+            <div class="row-number">06</div>
+            <div class="row-content">
+                <a href="https://github.com/aierlanjiu/racing-science-card-skill/issues" class="action-btn">Report Issue on GitHub</a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
